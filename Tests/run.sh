@@ -12,3 +12,5 @@ xcrun clang -fobjc-arc -fmodules -I . -I TouchUpCore \
 xcrun clang -I TouchUpCore -framework IOKit -framework CoreFoundation -framework CoreGraphics \
   Tests/HIDQueueFailureTests.c -o "$build_dir/hid-queue-failure-tests"
 "$build_dir/hid-queue-failure-tests"
+xcrun swiftc 'Touch Up/PermissionController.swift' Tests/PermissionTests.swift -o "$build_dir/permission-tests"
+"$build_dir/permission-tests"

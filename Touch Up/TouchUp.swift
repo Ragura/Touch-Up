@@ -55,7 +55,7 @@ class TouchUp: NSObject, ObservableObject {
     var idOfLastAddedScreen: UInt?
 
 
-    @Published var isAccessibilityAccessGranted = false
+    let permissions = PermissionController()
 
 
     @objc func screenParametersDidChange() {
@@ -79,18 +79,6 @@ class TouchUp: NSObject, ObservableObject {
     }
 
     
-    func checkAccessibilityAccessGranted() {
-        let checkOptPrompt = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as NSString
-        self.isAccessibilityAccessGranted = AXIsProcessTrustedWithOptions([checkOptPrompt: true] as CFDictionary?)
-    }
-    
-    func grantAccessibilityAccess() {
-        self.touchManager.triggerSystemAccessibilityAccessAlert()
-        (NSApp.delegate as? AppDelegate)?.settingsWindow.close()
-        self.isAccessibilityAccessGranted = true
-    }
-    
-    
     override init() {
         self.touchManager = TUCTouchInputManager()
 
@@ -105,7 +93,7 @@ class TouchUp: NSObject, ObservableObject {
         
         initPreferences()
         
-        checkAccessibilityAccessGranted()
+        permissions.refresh()
     }
     
     

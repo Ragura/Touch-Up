@@ -12,27 +12,6 @@ struct SettingsView: View {
     
     @ObservedObject var model: TouchUp
     
-    var welcomeBanner: some View {
-        Group {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Welcome to Touch Up 🐑")
-                    .font(.largeTitle)
-                Text("Touch Up converts USB HID data from any Windows certified touchscreen to mouse events.\nInjecting mouse events requires access to accessibility APIs. You can allow this by clicking the button below.")
-            }
-            
-            HStack {
-                Spacer()
-                Button {
-                    model.grantAccessibilityAccess()
-                } label: {
-                    
-                    Text("Grant Accessibility Access")
-                }
-                .buttonStyle(BorderedProminentButtonStyle())
-            }
-        }
-    }
-    
     var top: some View {
         Toggle(model.uiLabels(for: \.isPublishingMouseEventsEnabled).title, isOn: $model.isPublishingMouseEventsEnabled)
     }
@@ -152,17 +131,10 @@ struct SettingsView: View {
     var container: some View {
         if #available(macOS 13.0, *) {
             return Form {
-                if !model.isAccessibilityAccessGranted {
-                    Section {
-                        welcomeBanner
-                    } footer: {
-                        Rectangle()
-                            .frame(width:0, height:0)
-                            .foregroundColor(.clear)
-                    }
-
+                Section("Permissions") {
+                    PermissionStatusView(permissions: model.permissions)
                 }
-                
+
                 Section {
                     top
                 }
@@ -194,6 +166,9 @@ struct SettingsView: View {
 
         } else {
             return List {
+                LegacySection(title: "Permissions") {
+                    PermissionStatusView(permissions: model.permissions)
+                }
                 LegacySection {
                     top
                 }

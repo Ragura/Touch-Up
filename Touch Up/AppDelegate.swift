@@ -67,7 +67,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.model.touchManager.start()
         
         
-        if !model.isAccessibilityAccessGranted {
+        model.permissions.refresh()
+        if !model.permissions.snapshot.accessibility || !model.permissions.snapshot.inputMonitoring {
             self.showPreferences(nil)
         }
         
@@ -77,7 +78,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        model.permissions.refresh()
+    }
+
     func applicationWillTerminate(_ aNotification: Notification) {
+        model.permissions.stopMonitoring()
+        model.savePreferences()
         // Insert code here to tear down your application
         self.model.persistAllDigitizerMappings()
         self.model.touchManager.stop()
@@ -133,6 +140,7 @@ class SettingsWindow: NSWindow {
     }
     
     override func close() {
+        self.model?.permissions.stopMonitoring()
         self.model?.savePreferences()
 //        self.model?.persistAllDigitizerMappings()
         NSApp.stopModal()
@@ -140,6 +148,7 @@ class SettingsWindow: NSWindow {
     }
     
     func makeVisible() {
+        self.model?.permissions.startMonitoring()
         let alreadyOnScreen = self.isVisible
         
         self.setIsVisible(true)

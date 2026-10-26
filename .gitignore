@@ -68,3 +68,22 @@ fastlane/test_output
 # https://github.com/johnno1962/injectionforxcode
 
 iOSInjectionProject/
+
+# Local distribution artifacts, diagnostics, and signing credentials
+*.app/
+*.zip
+*.dmg
+*.pkg
+*.xcarchive/
+*.ips
+*.crash
+*.log
+*.p12
+*.p8
+*.pem
+*.key
+*.cer
+*.mobileprovision
+*.provisionprofile
+.env
+.env.*

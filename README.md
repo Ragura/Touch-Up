@@ -19,9 +19,10 @@ While the behavior of the driver is customizable, the default setting was inspir
 
 
 ### Installing the App
-- Compile the app or [download the latest notarized build here](https://github.com/shueber/Touch-Up/releases).
+- Build this fork using the instructions below. This fork has not published a notarized release.
+- [Upstream releases](https://github.com/shueber/Touch-Up/releases) are separate builds and do not include this fork's Drawing Mode or permission improvements.
 - If you wish, move the app into your Applications folder and add it as a Login item.
-- Launch it and allow Accessibility access.
+- Launch it and allow both Accessibility (Device Control & Data Access on macOS 27) and Input Monitoring access.
 - Plug in your touchscreen and start touching.
 
 
@@ -73,7 +74,8 @@ For a colleague's MacBook, send `build/Touch-Up-Drawing-Mode.zip`, extract it, c
 and quit any other copy of Touch Up before launching. An ad-hoc build is not notarized:
 macOS may block a downloaded copy. Use the normal **System Settings → Privacy & Security →
 Open Anyway** flow only for the copy you built and trust; workplace policy can prevent this.
-Then enable **Touch Up** in both **Privacy & Security → Accessibility** and
+Then enable **Touch Up** in both **Privacy & Security → Accessibility**
+(**Device Control & Data Access** on macOS 27) and
 **Privacy & Security → Input Monitoring**, quit and relaunch after granting access,
 connect the display's USB touch connection, check its **Touchscreens** mapping, and turn on
 **Drawing Mode**. Grant permission to the installed copy; permissions may need reapproval
@@ -116,12 +118,33 @@ Game developers, researchers, and others who need access to all touch data can a
 
 The Touch Up app itself is an example of integrating the TouchUpCore framework. You can have a look at the *DebugView* to see how you can visualize the different touch points. Remember that your app needs an Entitlement to access USB if running in the Sandbox.
 
-### USB connection crash fix (test build 2)
+### USB connection crash handling
 
-Five supplied crash reports from macOS 26.6.2 showed a null queue crash in
-`IOHIDQueueRegisterValueAvailableCallback`. Failed queue creation now logs a diagnostic,
+A null HID queue could crash `IOHIDQueueRegisterValueAvailableCallback`.
+Failed queue creation now logs a diagnostic,
 cleans up device state, and leaves the app running. The app requests Input Monitoring
 access at startup; that permission is separate from Accessibility. Queue creation can
-also fail for other reasons, so the crash reports alone do not prove permission denial.
+also fail for other reasons; queue failure alone does not prove permission denial.
 After granting access, quit and reopen Touch Up, then reconnect USB. This fix has a
 failure-injection regression test; successful Samsung USB input remains a hardware gate.
+
+### Permission status
+
+Two compact rows at the top of Settings show macOS-confirmed access independently:
+**Device Control & Data Access** (called **Accessibility** before macOS 27) and
+**Input Monitoring**. **Allow…** requests that permission and opens its System Settings
+page. Requesting never marks access granted; the user still approves it in macOS.
+Statuses refresh when Touch Up becomes active, when Settings opens, and every second
+while its Settings window remains open. Closing the window stops polling.
+
+If Input Monitoring becomes granted after being unavailable in this process, Settings
+shows a quit/reopen message and a Quit button. When macOS still reports denial after
+approval, the missing-permission row reminds the user to quit and reopen. Preferences
+are saved on quit. No permissions are automatically granted or reset.
+
+The permission tests use injected OS reads/requests and verify grants, revocations,
+request refusal, restart guidance, live polling and cleanup. `Tests/PermissionPreview.swift`
+renders the real component with fake states at 400 points wide without USB access or
+permission prompts. Missing, allowed and restart-required states were visually checked.
+The universal build passed; granting permissions and navigating System Settings still
+need validation on the installed, signed app on the target Mac.

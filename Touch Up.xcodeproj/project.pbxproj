@@ -33,6 +33,8 @@
 		70D2AFD12FC04E6400342757 /* DebugOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70D2AFD02FC04E6400342757 /* DebugOverlay.swift */; };
 		70FC06B62FC07F4100AB7995 /* Digitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70FC06B52FC07F4100AB7995 /* Digitizer.swift */; };
 		70FE7F8C2F858616005FF048 /* Icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 70FE7F8B2F858616005FF048 /* Icon.icon */; };
+		C0DE00000000000000000003 /* PermissionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000001 /* PermissionController.swift */; };
+		C0DE00000000000000000004 /* PermissionStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000002 /* PermissionStatusView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -87,6 +89,8 @@
 		70D2AFD02FC04E6400342757 /* DebugOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugOverlay.swift; sourceTree = "<group>"; };
 		70FC06B52FC07F4100AB7995 /* Digitizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Digitizer.swift; sourceTree = "<group>"; };
 		70FE7F8B2F858616005FF048 /* Icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Icon.icon; sourceTree = "<group>"; };
+		C0DE00000000000000000001 /* PermissionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionController.swift; sourceTree = "<group>"; };
+		C0DE00000000000000000002 /* PermissionStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionStatusView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -129,6 +133,8 @@
 		7052F42E298D2D280066014F /* Touch Up */ = {
 			isa = PBXGroup;
 			children = (
+				C0DE00000000000000000001 /* PermissionController.swift */,
+				C0DE00000000000000000002 /* PermissionStatusView.swift */,
 				70C8D696298D5D2B00CFA6D4 /* TouchUp.swift */,
 				7052F42F298D2D280066014F /* AppDelegate.swift */,
 				702F2BA9298D57BD00415DEA /* SettingsView.swift */,
@@ -291,6 +297,8 @@
 				704B2C6929978B2900A1DE4D /* DebugView.swift in Sources */,
 				7052F430298D2D280066014F /* AppDelegate.swift in Sources */,
 				702F2BAA298D57BD00415DEA /* SettingsView.swift in Sources */,
+				C0DE00000000000000000003 /* PermissionController.swift in Sources */,
+				C0DE00000000000000000004 /* PermissionStatusView.swift in Sources */,
 				70C8D697298D5D2B00CFA6D4 /* TouchUp.swift in Sources */,
 				70335ECB2FD15FBA00FD74B5 /* DigitizerMappingView.swift in Sources */,
 			);
