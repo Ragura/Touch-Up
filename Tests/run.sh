@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+build_dir="$(mktemp -d "${TMPDIR:-/tmp}/touch-up-tests.XXXXXX")"
+trap 'rm -rf "$build_dir"' EXIT
+xcrun clang -fobjc-arc -fmodules -I . -I TouchUpCore \
+  -framework AppKit -framework CoreGraphics \
+  Tests/DrawingModeTests.m TouchUpCore/TUCTouchInputManager.m \
+  TouchUpCore/TUCCursorUtilities.m TouchUpCore/TUCTouch.m TouchUpCore/TUCScreen.m \
+  -o "$build_dir/drawing-mode-tests"
+"$build_dir/drawing-mode-tests"
+xcrun clang -I TouchUpCore -framework IOKit -framework CoreFoundation -framework CoreGraphics \
+  Tests/HIDQueueFailureTests.c -o "$build_dir/hid-queue-failure-tests"
+"$build_dir/hid-queue-failure-tests"

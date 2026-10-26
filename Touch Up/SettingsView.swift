@@ -41,33 +41,40 @@ struct SettingsView: View {
     var gestureSettings: some View {
         Group {
             
-            let mode_ = Binding {
-                model.isClickOnLiftEnabled ? 2 : (model.isScrollingWithOneFingerEnabled ? 0 : 1)
-            } set: { value in
-                model.isScrollingWithOneFingerEnabled = value == 0
-                model.isClickOnLiftEnabled = value == 2
-            }
-            
-            Picker(selection: mode_) {
-                Text("Scroll").tag(0)
-                Text("Move Cursor").tag(1)
-                Text("Point and Click").tag(2)
-            } label: {
-                SettingsExplanationLabel(labels: ("On Finger Drag", "Specify which action should occur when dragging one finger on the touch screen."))
+            Toggle(isOn: $model.isDrawingModeEnabled) {
+                SettingsExplanationLabel(labels: ("Drawing Mode", "Press immediately on contact, drag while touching, and release on lift. Extra fingers are ignored; scrolling, pinch, and secondary click are disabled."))
             }
 
-            
-            Toggle(isOn: $model.isSecondaryClickEnabled) {
-                SettingsExplanationLabel(labels: model.uiLabels(for: \.isSecondaryClickEnabled))
+            Group {
+                let mode_ = Binding {
+                    model.isClickOnLiftEnabled ? 2 : (model.isScrollingWithOneFingerEnabled ? 0 : 1)
+                } set: { value in
+                    model.isScrollingWithOneFingerEnabled = value == 0
+                    model.isClickOnLiftEnabled = value == 2
+                }
+
+                Picker(selection: mode_) {
+                    Text("Scroll").tag(0)
+                    Text("Move Cursor").tag(1)
+                    Text("Point and Click").tag(2)
+                } label: {
+                    SettingsExplanationLabel(labels: ("On Finger Drag", "Specify which action should occur when dragging one finger on the touch screen."))
+                }
+
+
+                Toggle(isOn: $model.isSecondaryClickEnabled) {
+                    SettingsExplanationLabel(labels: model.uiLabels(for: \.isSecondaryClickEnabled))
+                }
+
+                Toggle(isOn: $model.isMagnificationEnabled) {
+                    SettingsExplanationLabel(labels: model.uiLabels(for: \.isMagnificationEnabled))
+                }
+
+                Toggle(isOn: $model.isClickWindowToFrontEnabled) {
+                    SettingsExplanationLabel(labels: model.uiLabels(for: \.isClickWindowToFrontEnabled))
+                }
             }
-            
-            Toggle(isOn: $model.isMagnificationEnabled) {
-                SettingsExplanationLabel(labels: model.uiLabels(for: \.isMagnificationEnabled))
-            }
-            
-            Toggle(isOn: $model.isClickWindowToFrontEnabled) {
-                SettingsExplanationLabel(labels: model.uiLabels(for: \.isClickWindowToFrontEnabled))
-            }
+            .disabled(model.isDrawingModeEnabled)
         }
     }
     

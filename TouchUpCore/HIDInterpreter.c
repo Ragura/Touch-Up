@@ -11,6 +11,7 @@
 #include <mach/mach_port.h>
 #include <IOKit/IOKitLib.h>
 #include <IOKit/hid/IOHIDManager.h>
+#include <IOKit/hidsystem/IOHIDLib.h>
 
 #include <CoreGraphics/CoreGraphics.h>
 
@@ -647,6 +648,12 @@ static HIDDeviceState* RegisterTouchDevice(IOHIDDeviceRef dev, uint32_t location
     void *context = (void *)dev;
 
     IOHIDQueueRef queue = IOHIDQueueCreate(kCFAllocatorDefault, dev, 1000, kNilOptions);
+    if (!queue) {
+        fprintf(stderr, "Touch Up: cannot create HID input queue for device %u (Input Monitoring access: %d). Check Privacy & Security > Input Monitoring, then relaunch Touch Up.\n",
+                locationID, (int)IOHIDCheckAccess(kIOHIDRequestTypeListenEvent));
+        DeallocateDeviceState(dev);
+        return NULL;
+    }
     IOHIDQueueRegisterValueAvailableCallback(queue, Handle_QueueValueAvailable, context);
     IOHIDQueueStart(queue);
     device->queue = queue;
@@ -695,7 +702,9 @@ static void Handle_DeviceMatchingCallback(
         IOHIDDeviceRef oldDev = existing->device;
         IOHIDDeviceRegisterInputValueCallback(oldDev, NULL, NULL);
         DeallocateDeviceState(oldDev);
-        RegisterTouchDevice(inIOHIDDeviceRef, locationID, contactCount);
+        if (!RegisterTouchDevice(inIOHIDDeviceRef, locationID, contactCount)) {
+            TouchInputManagerDidDisconnectTouchscreen(gTouchManager, locationID);
+        }
     } else {
         printf("Ignoring secondary interface for 0x%08x (%ld <= %ld contact collections)\n",
                locationID, contactCount, existing->contactCollectionCount);
@@ -775,13 +784,19 @@ static CFMutableDictionaryRef CreateDeviceMatchingDictionary(UInt32 inUsagePage,
 
 
 void OpenHIDManager(void *delegate) {
+    if (gHidManager) return;
     gTouchManager = delegate;
+    // Input Monitoring is separate from Accessibility. macOS owns the permission prompt.
+    if (!IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)) {
+        fprintf(stderr, "Touch Up: Input Monitoring is not granted. Enable it in Privacy & Security and relaunch.\n");
+    }
     
     
     gHidManager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
     
-    if (CFGetTypeID(gHidManager) != IOHIDManagerGetTypeID()) {
-        printf("OH CRAP THIS IS NOT AN HID MANAGER");
+    if (!gHidManager) {
+        fprintf(stderr, "Touch Up: failed to create HID manager.\n");
+        return;
     }
     
     
@@ -819,6 +834,7 @@ void OpenHIDManager(void *delegate) {
 
 
 void CloseHIDManager(void) {
+    if (!gHidManager) return;
     // clean up all active device states
     while (gDeviceCount > 0) {
         uint32_t locationID = gDevices[0].locationID;

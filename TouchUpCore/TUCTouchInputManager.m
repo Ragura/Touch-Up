@@ -12,6 +12,21 @@
 
 @interface TUCTouchInputManager ()
 
+@property BOOL running;
+@property (strong) TUCCursorUtilities *cursorUtilities;
+@property (strong, nullable) TUCTouch *drawingTouch;
+@property BOOL waitingForAllTouchesToLift;
+@property CGPoint drawingStartLocation;
+@property CGPoint drawingLastLocation;
+@property NSTimeInterval drawingStartTime;
+@property BOOL drawingQualifiedForTap;
+@property NSInteger drawingClickCount;
+@property BOOL hasPreviousDrawingTap;
+@property CGPoint previousDrawingTapLocation;
+@property uint32_t previousDrawingTapDevice;
+@property NSTimeInterval previousDrawingTapTime;
+@property NSInteger previousDrawingTapCount;
+
 @property NSMutableDictionary<NSNumber *, NSNumber *> *frameIDsByLocationID;
 
 @property (weak, nullable) TUCTouch *cursorTouch;
@@ -33,6 +48,8 @@
 #pragma mark   Start & Stop
 
 - (void)start {
+    if (self.running) return;
+    self.running = YES;
     
     __weak id weakSelf = self;
     
@@ -45,10 +62,17 @@
 }
 
 - (void)stop {
-    CloseHIDManager();
+    [self cancelCurrentInput];
+    [self.touchSet removeAllObjects];
+    self.waitingForAllTouchesToLift = NO;
+    if (self.running) {
+        self.running = NO;
+        CloseHIDManager();
+    }
 }
 
 - (void)setTouchscreensSeized:(BOOL)seized {
+    [self cancelCurrentInput];
     SetTouchDevicesSeized(seized);
 }
 
@@ -59,6 +83,15 @@
 }
 
 - (void)didDisconnectTouchscreenWithLocationID:(uint32_t)locationID {
+    if (self.drawingTouch.locationID == locationID || self.cursorTouch.locationID == locationID) {
+        [self cancelCurrentInput];
+    }
+    for (TUCTouch *touch in self.touchSet.allObjects) {
+        if (touch.locationID == locationID) [self.touchSet removeObject:touch];
+    }
+    if (self.activeTouches.count == 0) self.waitingForAllTouchesToLift = NO;
+    if (self.previousDrawingTapDevice == locationID) self.hasPreviousDrawingTap = NO;
+    [self.delegate touchesDidChange];
     [self.frameIDsByLocationID removeObjectForKey:@(locationID)];
     [self.delegate touchscreenDidDisconnectWithLocationID:locationID];
 }
@@ -80,12 +113,14 @@
 
         if (touch.lastUpdated + self.errorResistance < currentFrameID) {
             [touch setPhase:NSTouchPhaseCancelled];
+            if (touch == self.drawingTouch) [self finishDrawingTouchCancelled:YES];
             [self removeTouch:touch now:NO];
         }
     }
 
     if ([[self activeTouches] count] == 0) {
-        [self stopCurrentGesture];
+        self.waitingForAllTouchesToLift = NO;
+        if (!self.drawingModeEnabled) [self stopCurrentGesture];
     }
 
     self.frameIDsByLocationID[@(locationID)] = @(currentFrameID + 1);
@@ -96,8 +131,8 @@
 
 
 - (void)stopCurrentGesture {
-    [[TUCCursorUtilities sharedInstance] stopDraggingCursor];
-    [[TUCCursorUtilities sharedInstance] stopMagnifying];
+    [self.cursorUtilities stopDraggingCursor];
+    [self.cursorUtilities stopMagnifying];
 
     self.identifiedMultitouchGesture = _TUCCursorGestureNone;
 }
@@ -111,8 +146,19 @@
     
     // assume that this is an erroneous message!!!
     if (self.ignoreOriginTouches && CGPointEqualToPoint(digitizerPoint, CGPointZero)) {
+        // Liftoff reports sometimes contain no position. Still release at the last good point.
+        if (isOnSurface || !self.drawingModeEnabled) return;
+        TUCTouch *existing = [self findTouchWithID:contactID locationID:locationID includingPastTouches:NO];
+        if (!existing) return;
+        existing.isOnSurface = NO;
+        existing.phase = NSTouchPhaseEnded;
+        if (existing == self.drawingTouch) [self finishDrawingTouchCancelled:NO];
+        [self removeTouch:existing now:NO];
+        [self.delegate touchesDidChange];
         return;
     }
+    if (self.drawingModeEnabled && !isOnSurface &&
+        ![self findTouchWithID:contactID locationID:locationID includingPastTouches:NO]) return;
     
     CGPoint point = [self convertDigitizerPointToRelativeScreenPoint:digitizerPoint locationID:locationID];
     
@@ -133,6 +179,10 @@
     
     if (!isOnSurface) {
         [touch setPhase: NSTouchPhaseEnded];
+        if (touch == self.drawingTouch) {
+            [self updateDrawingLocation:touch];
+            [self finishDrawingTouchCancelled:NO];
+        }
         [self removeTouch:touch now:NO];
         [self.delegate touchesDidChange];
         return;
@@ -163,6 +213,7 @@
     }
     
     
+    if (self.drawingModeEnabled) [self processDrawingTouch:touch isNew:isNewTouch];
     [self.delegate touchesDidChange];
     
     return;
@@ -180,13 +231,102 @@
 
 
 
+#pragma mark - Immediate Drawing Input
+
+- (void)setDrawingModeEnabled:(BOOL)enabled {
+    if (_drawingModeEnabled == enabled) return;
+    [self cancelCurrentInput];
+    _drawingModeEnabled = enabled;
+}
+
+- (void)setPostMouseEvents:(BOOL)enabled {
+    if (_postMouseEvents == enabled) return;
+    [self cancelCurrentInput];
+    _postMouseEvents = enabled;
+}
+
+- (void)cancelCurrentInput {
+    [self finishDrawingTouchCancelled:YES];
+    [self stopCurrentGesture];
+    [self.cursorUtilities cancelMomentumScroll];
+    self.cursorTouch = nil;
+    self.gestureAdditionalTouch = nil;
+    self.hasPreviousDrawingTap = NO;
+    self.waitingForAllTouchesToLift = self.activeTouches.count > 0;
+}
+
+- (NSTimeInterval)inputTime {
+    return NSProcessInfo.processInfo.systemUptime;
+}
+
+- (CGFloat)drawingDistanceFrom:(CGPoint)a to:(CGPoint)b device:(uint32_t)device {
+    CGSize size = [self touchscreenForLocationID:device].nativePhysicalSize;
+    // Without panel dimensions, only identical points can safely qualify as nearby.
+    if (!isfinite(size.width) || !isfinite(size.height) || size.width <= 0 || size.height <= 0) {
+        return CGPointEqualToPoint(a, b) ? 0 : CGFLOAT_MAX;
+    }
+    return hypot((a.x - b.x) * size.width, (a.y - b.y) * size.height);
+}
+
+- (void)processDrawingTouch:(TUCTouch *)touch isNew:(BOOL)isNew {
+    if (!self.postMouseEvents || self.waitingForAllTouchesToLift) return;
+    if (self.drawingTouch) {
+        if (touch == self.drawingTouch) [self updateDrawingLocation:touch];
+        return;
+    }
+    if (!isNew || !touch.isOnSurface || ![self touchscreenForLocationID:touch.locationID]) return;
+    self.drawingTouch = touch;
+    self.drawingStartLocation = touch.location;
+    self.drawingStartTime = [self inputTime];
+    self.drawingQualifiedForTap = YES;
+    NSTimeInterval interval = self.drawingStartTime - self.previousDrawingTapTime;
+    BOOL isNextClick = self.hasPreviousDrawingTap &&
+        self.previousDrawingTapDevice == touch.locationID &&
+        interval >= 0 && interval <= NSEvent.doubleClickInterval &&
+        [self drawingDistanceFrom:touch.location to:self.previousDrawingTapLocation device:touch.locationID] <= self.doubleClickTolerance;
+    self.drawingClickCount = isNextClick ? self.previousDrawingTapCount % 3 + 1 : 1;
+    self.hasPreviousDrawingTap = NO;
+    self.drawingLastLocation = [self clampScreenPointRelativeToAbsolute:touch.location locationID:touch.locationID];
+    [self.cursorUtilities beginDrawingAt:self.drawingLastLocation clickCount:self.drawingClickCount];
+}
+
+- (void)updateDrawingLocation:(TUCTouch *)touch {
+    if (![self touchscreenForLocationID:touch.locationID]) {
+        [self cancelCurrentInput];
+        return;
+    }
+    // Cumulative movement prevents a slow stroke from being mistaken for a tap.
+    if ([self drawingDistanceFrom:touch.location to:self.drawingStartLocation device:touch.locationID] > MAX(0.5, self.stationaryThreshold)) {
+        self.drawingQualifiedForTap = NO;
+    }
+    CGPoint location = [self clampScreenPointRelativeToAbsolute:touch.location locationID:touch.locationID];
+    if (!CGPointEqualToPoint(location, self.drawingLastLocation)) {
+        [self.cursorUtilities continueDrawingAt:location];
+        self.drawingLastLocation = location;
+    }
+}
+
+- (void)finishDrawingTouchCancelled:(BOOL)cancelled {
+    if (!self.drawingTouch) return;
+    [self.cursorUtilities endDrawingAt:self.drawingLastLocation];
+    self.hasPreviousDrawingTap = !cancelled && self.drawingQualifiedForTap &&
+        [self inputTime] - self.drawingStartTime <= NSEvent.doubleClickInterval;
+    self.previousDrawingTapLocation = self.drawingStartLocation;
+    self.previousDrawingTapDevice = self.drawingTouch.locationID;
+    self.previousDrawingTapTime = self.drawingStartTime;
+    self.previousDrawingTapCount = self.drawingClickCount;
+    self.drawingTouch = nil;
+    // Do not promote an extra finger, including a new contact later in this HID report.
+    self.waitingForAllTouchesToLift = YES;
+}
+
 #pragma mark - Mouse Cursor Management
 
 
 
 - (void)processTouchesForCursorInput {
     
-    if(!self.cursorTouch || !self.postMouseEvents) {
+    if(self.drawingModeEnabled || self.waitingForAllTouchesToLift || !self.cursorTouch || !self.postMouseEvents) {
         return;
     }
     
@@ -346,12 +486,12 @@
     CGPoint screenLocation = [self clampScreenPointRelativeToAbsolute:touch.location locationID:touch.locationID];
     CGPoint location2ndFinger = [self clampScreenPointRelativeToAbsolute:self.gestureAdditionalTouch.location locationID:touch.locationID];
     
-    TUCCursorUtilities *utils = [TUCCursorUtilities sharedInstance];
+    TUCCursorUtilities *utils = self.cursorUtilities;
     
     TUCCursorAction action = [self actionForGesture:gesture];
     
     CGFloat doubleClickSpan = self.doubleClickTolerance * [[self touchscreenForLocationID:touch.locationID] pixelsPerMM];
-    [[TUCCursorUtilities sharedInstance] setDoubleClickTolerance:doubleClickSpan];
+    [self.cursorUtilities setDoubleClickTolerance:doubleClickSpan];
     
     switch (action) {
         case TUCCursorActionNone:
@@ -712,9 +852,14 @@
 #pragma mark -
 
 - (instancetype)init {
+    return [self initWithCursorUtilities:[TUCCursorUtilities sharedInstance]];
+}
+
+- (instancetype)initWithCursorUtilities:(TUCCursorUtilities *)utilities {
     if(self = [super init]) {
+        self.cursorUtilities = utilities;
         self.touchSet = [NSMutableSet new];
-        self.postMouseEvents = YES;
+        _postMouseEvents = YES;
         
         self.cursorTouchQualifiedForTap = NO;
         self.cursorTouchStationarySinceDate = nil;
@@ -734,6 +879,10 @@
 }
 
 
+- (void)dealloc {
+    [self stop];
+}
+
 - (NSString *)debugDescription {
     NSMutableString *str = [[NSString stringWithFormat:@"Touch Set contains %ld touches:{\n", [self.touchSet count]] mutableCopy];
     
@@ -751,8 +900,8 @@
 }
 
 - (void)triggerSystemAccessibilityAccessAlert {
-    CGPoint loc = [[TUCCursorUtilities sharedInstance] currentCursorLocation];
-    [[TUCCursorUtilities sharedInstance] moveCursorTo:loc];
+    CGPoint loc = [self.cursorUtilities currentCursorLocation];
+    [self.cursorUtilities moveCursorTo:loc];
 }
 
 

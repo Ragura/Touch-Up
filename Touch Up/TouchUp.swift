@@ -28,6 +28,7 @@ class TouchUp: NSObject, ObservableObject {
     @Published var errorResistance: NSInteger = 0 // num of Reports to wait before cancelling a touch
     @Published var ignoreOriginTouches: Bool = false
     
+    @Published var isDrawingModeEnabled = false
     @Published var isScrollingWithOneFingerEnabled = false
     @Published var isSecondaryClickEnabled = false
     @Published var isMagnificationEnabled = false
@@ -58,6 +59,7 @@ class TouchUp: NSObject, ObservableObject {
 
 
     @objc func screenParametersDidChange() {
+        self.touchManager.cancelCurrentInput()
         // identify which screen is newly added.
         let oldScreenList = self.connectedScreens
         self.connectedScreens = TUCScreen.allScreens()
@@ -128,6 +130,7 @@ extension TouchUp {
             "errorResistance" : 4,
             "ignoreOriginTouches" : true,
 
+            "isDrawingModeEnabled" : false,
             "isScrollingWithOneFingerEnabled" : true,
             "isSecondaryClickEnabled" : true,
             "isMagnificationEnabled" : true,
@@ -147,6 +150,7 @@ extension TouchUp {
 
 
         self.observers = [
+            $isDrawingModeEnabled.assign(to: \.drawingModeEnabled, on: touchManager),
             $isPublishingMouseEventsEnabled.assign(to: \.postMouseEvents, on: touchManager),
             $holdDuration.assign(to: \.holdDuration, on: touchManager),
             $doubleClickDistance.assign(to: \.doubleClickTolerance, on: touchManager),
@@ -162,6 +166,7 @@ extension TouchUp {
         
         
         
+        isDrawingModeEnabled = defaults.bool(forKey: "isDrawingModeEnabled")
         isScrollingWithOneFingerEnabled = defaults.bool(forKey: "isScrollingWithOneFingerEnabled")
         isSecondaryClickEnabled = defaults.bool(forKey: "isSecondaryClickEnabled")
         isMagnificationEnabled = defaults.bool(forKey: "isMagnificationEnabled")
@@ -182,6 +187,7 @@ extension TouchUp {
         defaults.set(ignoreOriginTouches, forKey: "ignoreOriginTouches")
         defaults.set(isExclusiveAccessEnabled, forKey: "isExclusiveAccessEnabled")
 
+        defaults.set(isDrawingModeEnabled, forKey: "isDrawingModeEnabled")
         defaults.set(isScrollingWithOneFingerEnabled, forKey: "isScrollingWithOneFingerEnabled")
         defaults.set(isSecondaryClickEnabled, forKey: "isSecondaryClickEnabled")
         defaults.set(isMagnificationEnabled, forKey: "isMagnificationEnabled")
@@ -233,6 +239,7 @@ extension TouchUp {
     /// Storing the UUID makes the mapping confirmed, so it survives rearrange/rotate/mirror.
     func assignScreen(_ screen: TUCScreen?, toDigitizer locationID: HIDLocationID) {
         guard var config = digitizerConfigs[locationID] else { return }
+        touchManager.cancelCurrentInput()
         config.screenUUID = screen?.uuid
         config.screenID = screen.map { UInt($0.id) }
         digitizerConfigs[locationID] = config
@@ -242,6 +249,7 @@ extension TouchUp {
     /// Sets the additional digitizer rotation (user action) and persists it immediately.
     func setRotation(_ rotation: CGFloat, forDigitizer locationID: HIDLocationID) {
         guard var config = digitizerConfigs[locationID] else { return }
+        touchManager.cancelCurrentInput()
         config.additionalRotation = rotation
         digitizerConfigs[locationID] = config
         persistMapping(forLocationID: locationID)

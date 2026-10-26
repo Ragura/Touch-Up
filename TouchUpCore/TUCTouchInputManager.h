@@ -24,7 +24,13 @@ NS_ASSUME_NONNULL_BEGIN
  Allows to deactiate that the framework processes touches to post them as mouse events.
  The default value is YES.
  */
-@property BOOL postMouseEvents;
+@property (nonatomic) BOOL postMouseEvents;
+
+/** Immediate primary-button input for drawing. Default NO; extra contacts are ignored. */
+@property (nonatomic) BOOL drawingModeEnabled;
+
+/** Release generated input and require existing contacts to lift before starting again. */
+- (void)cancelCurrentInput;
 
 
 /**
