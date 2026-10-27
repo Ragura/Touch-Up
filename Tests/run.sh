@@ -17,3 +17,8 @@ xcrun swiftc 'Touch Up/PermissionController.swift' Tests/PermissionTests.swift -
 
 xcrun swiftc 'Touch Up/RestartController.swift' Tests/RestartTests.swift -o "$build_dir/restart-tests"
 "$build_dir/restart-tests"
+
+xcrun clang -fsanitize=address,undefined -g -I TouchUpCore \
+  -framework IOKit -framework CoreFoundation -framework CoreGraphics \
+  Tests/HIDParserTests.c -o "$build_dir/hid-parser-tests"
+"$build_dir/hid-parser-tests"

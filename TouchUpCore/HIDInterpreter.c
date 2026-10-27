@@ -8,6 +8,7 @@
 #include "HIDInterpreter.h"
 #include "TUCTouchInputManager-C.h"
 
+#include <math.h>
 #include <mach/mach_port.h>
 #include <IOKit/IOKitLib.h>
 #include <IOKit/hid/IOHIDManager.h>
@@ -99,9 +100,9 @@ HIDDeviceState* AllocateDeviceState(IOHIDDeviceRef device, uint32_t locationID) 
     state->locationID = locationID;
     state->isActive = TRUE;
     state->contactCount = 1;
-    state->touchCollectionElements = CFArrayCreateMutable(kCFAllocatorDefault, 0, NULL);
-    state->contactIdentifiers = CFArrayCreateMutable(kCFAllocatorDefault, 0, NULL);
-    state->storedInputValues = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, NULL, NULL);
+    state->touchCollectionElements = CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
+    state->contactIdentifiers = CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
+    state->storedInputValues = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     
     gDeviceCount++;
     return state;
@@ -218,7 +219,7 @@ CFIndex ValueOfElement(HIDDeviceState *device, IOHIDElementRef element) {
         return kCFNotFound;
     }
     
-    int64_t hash = StorageKeyForElement(element);
+    int32_t hash = (int32_t)StorageKeyForElement(element);
     CFNumberRef key = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &hash);
     
     if (CFDictionaryContainsKey(device->storedInputValues, key)) {
@@ -241,7 +242,7 @@ void StoreInputValue(HIDDeviceState *device, IOHIDValueRef hidValue) {
     CFIndex value = IOHIDValueGetIntegerValue(hidValue);
     IOHIDElementRef elem = IOHIDValueGetElement(hidValue);
     
-    CFIndex keyValue = StorageKeyForElement(elem);
+    int32_t keyValue = (int32_t)StorageKeyForElement(elem);
     
     CFNumberRef key = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &keyValue);
     
@@ -258,6 +259,13 @@ void StoreInputValue(HIDDeviceState *device, IOHIDValueRef hidValue) {
     CFIndex usage = IOHIDElementGetUsage(elem);
     
     if (page == kHIDPage_Digitizer && usage == kHIDUsage_Dig_ContactCount) {
+        // Bound device-controlled counts before offset arithmetic. Touchscreens
+        // cannot meaningfully supply more than 256 simultaneous contacts here.
+        if (value < 0 || value > 256) {
+            device->contactCount = 0;
+            device->hybridOffset = 0;
+            return;
+        }
         // hybrid mode can only exist if the old value is larger than the number of collections that can be communicated at once
         CFIndex numCollections = CFArrayGetCount(device->touchCollectionElements);
         
@@ -296,7 +304,7 @@ void IdentifyElements(HIDDeviceState *device, IOHIDElementRef anyElement, Boolea
     
     
     CFArrayRef children = IOHIDElementGetChildren(applicationCollection);
-    CFIndex numChildren = CFArrayGetCount(children);
+    CFIndex numChildren = children ? CFArrayGetCount(children) : 0;
     
     if (printTree) {
         printf("# parent (type %u) has %ld children:\n", type, numChildren);
@@ -317,7 +325,7 @@ void IdentifyElements(HIDDeviceState *device, IOHIDElementRef anyElement, Boolea
             if (printTree) {
                 printf(" > Logical collection %ld\n", i);
                 CFArrayRef grandchildren = IOHIDElementGetChildren(element);
-                for( CFIndex j=0; j<CFArrayGetCount(grandchildren); j++) {
+                for( CFIndex j=0; grandchildren && j<CFArrayGetCount(grandchildren); j++) {
                     IOHIDElementRef gch = (IOHIDElementRef)CFArrayGetValueAtIndex(grandchildren, j);
                     CFIndex page = IOHIDElementGetUsagePage(gch);
                     CFIndex usage = IOHIDElementGetUsage(gch);
@@ -365,7 +373,7 @@ void PrintTouchCollection(HIDDeviceState *device, IOHIDElementRef collection) {
     CFArrayRef children = IOHIDElementGetChildren(collection);
     
     // get stored values of all touches
-    for (CFIndex i=0; i<CFArrayGetCount(children); i++) {
+    for (CFIndex i=0; children && i<CFArrayGetCount(children); i++) {
         IOHIDElementRef element = (IOHIDElementRef)CFArrayGetValueAtIndex(children, i);
         
         CFIndex page = IOHIDElementGetUsagePage(element);
@@ -418,6 +426,15 @@ void PrintTouchCollection(HIDDeviceState *device, IOHIDElementRef collection) {
  Dispatches touch data for the given collection, but only if all values needed were received
  */
 
+// Invalid descriptors and out-of-range reports must not become mouse coordinates.
+static bool NormalizeCoordinate(CFIndex value, CFIndex minimum, CFIndex maximum, CGFloat *result) {
+    if (maximum <= minimum || value < minimum || value > maximum) return false;
+    CGFloat normalized = ((CGFloat)value - (CGFloat)minimum) / ((CGFloat)maximum - (CGFloat)minimum);
+    if (!isfinite(normalized) || normalized < 0 || normalized > 1) return false;
+    *result = normalized;
+    return true;
+}
+
 void DispatchTouchDataForCollection(HIDDeviceState *device, IOHIDElementRef collection) {
     
     CFArrayRef children = IOHIDElementGetChildren(collection);
@@ -434,7 +451,7 @@ void DispatchTouchDataForCollection(HIDDeviceState *device, IOHIDElementRef coll
     CFIndex azimuth = kCFNotFound;
     
     // get stored values of all touches
-    for (CFIndex i=0; i<CFArrayGetCount(children); i++) {
+    for (CFIndex i=0; children && i<CFArrayGetCount(children); i++) {
         IOHIDElementRef element = (IOHIDElementRef)CFArrayGetValueAtIndex(children, i);
         
         CFIndex page = IOHIDElementGetUsagePage(element);
@@ -444,17 +461,13 @@ void DispatchTouchDataForCollection(HIDDeviceState *device, IOHIDElementRef coll
         if (value != kCFNotFound) {
             if (page == kHIDPage_GenericDesktop) {
                 if (usage == kHIDUsage_GD_X) {
-                    CGFloat min = (CGFloat)IOHIDElementGetLogicalMin(element);
-                    CGFloat max = (CGFloat)IOHIDElementGetLogicalMax(element);
-                    CGFloat curr = (CGFloat)value;
-                    x = ( (curr - min) / (max - min) ) + min;
+                    if (!NormalizeCoordinate(value, IOHIDElementGetLogicalMin(element),
+                                             IOHIDElementGetLogicalMax(element), &x)) return;
                 }
                 
                 else if (usage == kHIDUsage_GD_Y) {
-                    CGFloat min = (CGFloat)IOHIDElementGetLogicalMin(element);
-                    CGFloat max = (CGFloat)IOHIDElementGetLogicalMax(element);
-                    CGFloat curr = (CGFloat)value;
-                    y = ( (curr - min) / (max - min) ) + min;
+                    if (!NormalizeCoordinate(value, IOHIDElementGetLogicalMin(element),
+                                             IOHIDElementGetLogicalMax(element), &y)) return;
                 }
             } //kHIDPage_GenericDesktop
             
@@ -475,6 +488,7 @@ void DispatchTouchDataForCollection(HIDDeviceState *device, IOHIDElementRef coll
             } // kHIDPage_Digitizer
         }
     }
+    if (x < 0 || y < 0 || contactID < 0 || (tipSwitch != 0 && tipSwitch != 1)) return;
     TouchInputManagerUpdateTouchPosition(gTouchManager, device->locationID, contactID, x, y, (int)tipSwitch, (int)isValid);
     
     //    if (width != kCFNotFound && height != kCFNotFound && azimuth != kCFNotFound) {
@@ -488,6 +502,9 @@ void DispatchTouchDataForCollection(HIDDeviceState *device, IOHIDElementRef coll
 void DispatchTouches(HIDDeviceState *device) {
     
     CFIndex numCollections = CFArrayGetCount(device->touchCollectionElements);
+    if (device->hybridOffset < 0 || device->hybridOffset > device->contactCount) {
+        device->hybridOffset = 0;
+    }
     CFIndex remainingUpdates = device->contactCount - device->hybridOffset;
     
     CFIndex numUpdates = numCollections;
@@ -622,7 +639,7 @@ static CFIndex CountContactCollections(IOHIDDeviceRef dev) {
         if (IOHIDElementGetCollectionType(el) != kIOHIDElementCollectionTypeLogical) continue;
 
         CFArrayRef kids = IOHIDElementGetChildren(el);
-        for (CFIndex j = 0; j < CFArrayGetCount(kids); j++) {
+        for (CFIndex j = 0; kids && j < CFArrayGetCount(kids); j++) {
             IOHIDElementRef kid = (IOHIDElementRef)CFArrayGetValueAtIndex(kids, j);
             if (IOHIDElementGetUsagePage(kid) == kHIDPage_Digitizer &&
                 IOHIDElementGetUsage(kid) == kHIDUsage_Dig_ContactIdentifier) {
@@ -812,9 +829,10 @@ void OpenHIDManager(void *delegate) {
     
     
     CFArrayRef matches = CFArrayCreate(kCFAllocatorDefault,
-                                       (const void **)matchesList, 1, NULL);
+                                       (const void **)matchesList, 1, &kCFTypeArrayCallBacks);
     IOHIDManagerSetDeviceMatchingMultiple(gHidManager, matches);
     CFRelease(matches);
+    if (matchesList[0]) CFRelease(matchesList[0]);
     
     IOHIDManagerRegisterDeviceMatchingCallback(gHidManager, Handle_DeviceMatchingCallback, NULL);
     IOHIDManagerRegisterDeviceRemovalCallback(gHidManager, Handle_RemovalCallback, NULL);
