@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import CoreGraphics
 import IOKit
 
 struct PermissionSnapshot: Equatable {
@@ -7,7 +8,7 @@ struct PermissionSnapshot: Equatable {
     var inputMonitoring: Bool
 }
 
-enum TouchPermission {
+enum TouchPermission: Hashable {
     case accessibility, inputMonitoring
 }
 
@@ -19,14 +20,15 @@ struct PermissionAccess {
 
     static let system = PermissionAccess(
         read: {
-            PermissionSnapshot(accessibility: AXIsProcessTrusted(),
+            PermissionSnapshot(accessibility: CGPreflightPostEventAccess(),
                                inputMonitoring: IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted)
         },
         request: { permission in
             switch permission {
             case .accessibility:
-                let prompt = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-                _ = AXIsProcessTrustedWithOptions([prompt: true] as CFDictionary)
+                // Request the capability used by CGEventPost. Broad AX trust requests
+                // do not provide the sandboxed app's event-posting consent flow.
+                _ = CGRequestPostEventAccess()
             case .inputMonitoring:
                 _ = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
             }
@@ -43,6 +45,7 @@ final class PermissionController: ObservableObject {
     @Published private(set) var snapshot: PermissionSnapshot
     @Published private(set) var inputMonitoringNeedsRestart = false
     @Published private(set) var settingsOpenFailed = false
+    @Published private(set) var requestedPermissions: Set<TouchPermission> = []
     private let access: PermissionAccess
     private var sawInputMonitoringUnavailable: Bool
     private var refreshTimer: Timer?
@@ -63,8 +66,15 @@ final class PermissionController: ObservableObject {
     }
 
     func request(_ permission: TouchPermission) {
+        requestedPermissions.insert(permission)
+        settingsOpenFailed = false
         access.request(permission)
         refresh()
+        // Let the system permission dialog handle its own navigation. Opening
+        // Settings here can race that dialog and show the list before registration.
+    }
+
+    func openSettings(_ permission: TouchPermission) {
         settingsOpenFailed = !access.openSettings(permission)
     }
 

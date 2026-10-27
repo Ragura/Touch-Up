@@ -11,6 +11,7 @@ import TouchUpCore
 struct SettingsView: View {
     
     @ObservedObject var model: TouchUp
+    @ObservedObject var restarter: RestartController
     
     var top: some View {
         Toggle(model.uiLabels(for: \.isPublishingMouseEventsEnabled).title, isOn: $model.isPublishingMouseEventsEnabled)
@@ -132,7 +133,7 @@ struct SettingsView: View {
         if #available(macOS 13.0, *) {
             return Form {
                 Section("Permissions") {
-                    PermissionStatusView(permissions: model.permissions)
+                    PermissionStatusView(permissions: model.permissions, restarter: restarter)
                 }
 
                 Section {
@@ -167,7 +168,7 @@ struct SettingsView: View {
         } else {
             return List {
                 LegacySection(title: "Permissions") {
-                    PermissionStatusView(permissions: model.permissions)
+                    PermissionStatusView(permissions: model.permissions, restarter: restarter)
                 }
                 LegacySection {
                     top
@@ -254,6 +255,6 @@ struct SettingsExplanationLabel: View {
 
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        SettingsView(model: TouchUp())
+        SettingsView(model: TouchUp(), restarter: RestartController(prepare: {}, recover: {}, launch: { _ in }, terminate: {}))
     }
 }

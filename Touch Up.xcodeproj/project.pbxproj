@@ -36,6 +36,7 @@
 		C0DE00000000000000000003 /* PermissionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000001 /* PermissionController.swift */; };
 		C0DE00000000000000000004 /* PermissionStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000002 /* PermissionStatusView.swift */; };
 		C0DE00000000000000000005 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000006 /* LICENSE */; };
+		C0DE00000000000000000007 /* RestartController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000008 /* RestartController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,6 +94,7 @@
 		C0DE00000000000000000001 /* PermissionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionController.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000002 /* PermissionStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionStatusView.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000006 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = SOURCE_ROOT; };
+		C0DE00000000000000000008 /* RestartController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -136,6 +138,7 @@
 			isa = PBXGroup;
 			children = (
 				C0DE00000000000000000001 /* PermissionController.swift */,
+				C0DE00000000000000000008 /* RestartController.swift */,
 				C0DE00000000000000000002 /* PermissionStatusView.swift */,
 				70C8D696298D5D2B00CFA6D4 /* TouchUp.swift */,
 				7052F42F298D2D280066014F /* AppDelegate.swift */,
@@ -301,6 +304,7 @@
 				7052F430298D2D280066014F /* AppDelegate.swift in Sources */,
 				702F2BAA298D57BD00415DEA /* SettingsView.swift in Sources */,
 				C0DE00000000000000000003 /* PermissionController.swift in Sources */,
+				C0DE00000000000000000007 /* RestartController.swift in Sources */,
 				C0DE00000000000000000004 /* PermissionStatusView.swift in Sources */,
 				70C8D697298D5D2B00CFA6D4 /* TouchUp.swift in Sources */,
 				70335ECB2FD15FBA00FD74B5 /* DigitizerMappingView.swift in Sources */,
@@ -472,7 +476,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Touch Up/Touch_Up.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 9;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -486,7 +490,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 1.2.0;
+				MARKETING_VERSION = 1.2.3;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.Ragura.TouchUp";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -502,7 +506,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Touch Up/Touch_Up.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 9;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -516,7 +520,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 1.2.0;
+				MARKETING_VERSION = 1.2.3;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.Ragura.TouchUp";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -530,7 +534,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 9;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -563,7 +567,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 9;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;

@@ -132,14 +132,19 @@ failure-injection regression test; successful Samsung USB input remains a hardwa
 
 Two compact rows at the top of Settings show macOS-confirmed access independently:
 **Device Control & Data Access** (called **Accessibility** before macOS 27) and
-**Input Monitoring**. **Allow…** requests that permission and opens its System Settings
-page. Requesting never marks access granted; the user still approves it in macOS.
+**Input Monitoring**. **Allow…** requests that permission through macOS. After a
+request, **Open Settings** provides explicit navigation if needed; the app does not
+open Settings concurrently with the system prompt. Device Control & Data Access uses Core Graphics' event-posting permission
+request and preflight check, matching the mouse events this sandboxed app generates.
+It does not request broad Accessibility client trust. Requesting never marks access
+granted; the user still approves it in macOS.
 Statuses refresh when Touch Up becomes active, when Settings opens, and every second
 while its Settings window remains open. Closing the window stops polling.
 
 If Input Monitoring becomes granted after being unavailable in this process, Settings
-shows a quit/reopen message and a Quit button. When macOS still reports denial after
-approval, the missing-permission row reminds the user to quit and reopen. Preferences
+shows a quit/reopen message and a Quit and Reopen button. Whenever either permission still reports unavailable, a shared hint and Quit and Reopen button
+explain that users should quit and reopen after enabling permissions in Settings.
+This also covers event-posting grants that remain cached as unavailable until restart. Preferences
 are saved on quit. No permissions are automatically granted or reset.
 
 The permission tests use injected OS reads/requests and verify grants, revocations,
@@ -163,3 +168,9 @@ It rebuilds, signs, notarizes and staples the app, creates a drag-to-Application
 DMG, and notarizes and staples that DMG. It stops on failed validation; it does not
 publish a GitHub release. Review the saved notarization logs and test the downloaded
 DMG and permissions on the target Mac before distributing it to colleagues.
+
+The Quit and Reopen button saves preferences and screen mappings, releases HID input,
+then asks macOS to launch a fresh instance of the same app and show its settings.
+The old instance exits only after launch succeeds. If launch fails, input resumes and
+the settings window displays manual restart guidance. No shell scripts or timed delays
+are used for relaunching.

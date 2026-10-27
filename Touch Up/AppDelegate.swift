@@ -25,8 +25,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     
     
+    lazy var restarter = RestartController(prepare: { [unowned self] in
+        self.model.savePreferences()
+        self.model.persistAllDigitizerMappings()
+        UserDefaults.standard.synchronize()
+        self.model.permissions.stopMonitoring()
+        self.model.touchManager.stop()
+        self.settingsWindow.orderOut(nil)
+    }, recover: { [unowned self] in
+        self.model.touchManager.start()
+        self.showPreferences(nil)
+    })
+
     lazy var settingsWindow: SettingsWindow = {
-        return SettingsWindow.window(model: self.model)
+        return SettingsWindow.window(model: self.model, restarter: self.restarter)
     }()
     
     lazy var debugOverlay: DebugOverlay = {
@@ -68,7 +80,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         
         model.permissions.refresh()
-        if !model.permissions.snapshot.accessibility || !model.permissions.snapshot.inputMonitoring {
+        if CommandLine.arguments.contains("--show-settings") || !model.permissions.snapshot.accessibility || !model.permissions.snapshot.inputMonitoring {
             self.showPreferences(nil)
         }
         
@@ -84,9 +96,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ aNotification: Notification) {
         model.permissions.stopMonitoring()
-        model.savePreferences()
-        // Insert code here to tear down your application
-        self.model.persistAllDigitizerMappings()
+        // A restart already saved before stopping HID; do not overwrite mappings
+        // with the disconnected state after the replacement has started.
+        if !restarter.isRestarting {
+            model.savePreferences()
+            self.model.persistAllDigitizerMappings()
+        }
         self.model.touchManager.stop()
     }
 
@@ -119,8 +134,8 @@ class SettingsWindow: NSWindow {
     
     var model: TouchUp?
     
-    static func window(model: TouchUp) -> SettingsWindow {
-        let vc = NSHostingController(rootView: SettingsView(model:model))
+    static func window(model: TouchUp, restarter: RestartController) -> SettingsWindow {
+        let vc = NSHostingController(rootView: SettingsView(model: model, restarter: restarter))
         let window = SettingsWindow(contentRect: .zero,
                                     styleMask: [.closable, .titled, .fullSizeContentView, .resizable],
                                     backing: .buffered,

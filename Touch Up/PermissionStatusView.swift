@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PermissionStatusView: View {
     @ObservedObject var permissions: PermissionController
-    var quit: () -> Void = { NSApp.terminate(nil) }
+    @ObservedObject var restarter: RestartController
 
     private var controlTitle: String {
         if #available(macOS 27.0, *) { return "Device Control & Data Access" }
@@ -13,15 +13,21 @@ struct PermissionStatusView: View {
         VStack(alignment: .leading, spacing: 8) {
             permissionRow(controlTitle, granted: permissions.snapshot.accessibility, permission: .accessibility)
             permissionRow("Input Monitoring", granted: permissions.snapshot.inputMonitoring, permission: .inputMonitoring)
-            if permissions.inputMonitoringNeedsRestart {
+            if permissions.inputMonitoringNeedsRestart || !permissions.snapshot.accessibility || !permissions.snapshot.inputMonitoring {
                 HStack(alignment: .top) {
-                    Text("Input access changed. Quit and reopen Touch Up.")
+                    Text(permissions.inputMonitoringNeedsRestart
+                         ? "Permissions changed. Quit and reopen Touch Up."
+                         : "After enabling permissions in Settings, quit and reopen Touch Up.")
                         .font(.caption).foregroundColor(.secondary)
                     Spacer(minLength: 4)
-                    Button("Quit", action: quit).controlSize(.small)
+                    Button("Quit and Reopen", action: restarter.restart)
+                        .controlSize(.small)
+                        .disabled(restarter.isRestarting)
                 }
-            } else if !permissions.snapshot.inputMonitoring {
-                Text("After allowing input, quit and reopen Touch Up.")
+
+            }
+            if restarter.failed {
+                Text("Could not reopen Touch Up. Quit and open it from Applications.")
                     .font(.caption).foregroundColor(.secondary)
             }
             if permissions.settingsOpenFailed {
@@ -41,9 +47,13 @@ struct PermissionStatusView: View {
             if granted {
                 Text("Allowed").font(.caption).foregroundColor(.secondary)
             } else {
-                Button("Allow…") { permissions.request(permission) }
-                    .controlSize(.small)
-                    .accessibilityLabel("Allow \(title)")
+                let requested = permissions.requestedPermissions.contains(permission)
+                Button(requested ? "Open Settings" : "Allow…") {
+                    if requested { permissions.openSettings(permission) }
+                    else { permissions.request(permission) }
+                }
+                .controlSize(.small)
+                .accessibilityLabel(requested ? "Open Settings for \(title)" : "Allow \(title)")
             }
         }
         .accessibilityElement(children: .contain)

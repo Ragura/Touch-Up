@@ -14,3 +14,6 @@ xcrun clang -I TouchUpCore -framework IOKit -framework CoreFoundation -framework
 "$build_dir/hid-queue-failure-tests"
 xcrun swiftc 'Touch Up/PermissionController.swift' Tests/PermissionTests.swift -o "$build_dir/permission-tests"
 "$build_dir/permission-tests"
+
+xcrun swiftc 'Touch Up/RestartController.swift' Tests/RestartTests.swift -o "$build_dir/restart-tests"
+"$build_dir/restart-tests"

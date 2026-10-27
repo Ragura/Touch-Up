@@ -13,10 +13,14 @@ struct PermissionTests {
         precondition(requested.isEmpty && opened.isEmpty) // Passive refresh never prompts.
         permissions.request(.accessibility)
         precondition(!permissions.snapshot.accessibility)
-        precondition(requested == [.accessibility] && opened == [.accessibility])
+        precondition(requested == [.accessibility] && opened.isEmpty)
+        precondition(permissions.requestedPermissions.contains(.accessibility))
         permissions.request(.inputMonitoring)
         precondition(!permissions.snapshot.inputMonitoring)
-        precondition(requested == [.accessibility, .inputMonitoring])
+        precondition(requested == [.accessibility, .inputMonitoring] && opened.isEmpty)
+        permissions.openSettings(.accessibility)
+        permissions.openSettings(.inputMonitoring)
+        precondition(opened == [.accessibility, .inputMonitoring])
         current.accessibility = true
         permissions.refresh()
         precondition(permissions.snapshot.accessibility && !permissions.snapshot.inputMonitoring)
@@ -31,10 +35,10 @@ struct PermissionTests {
         permissions.refresh()
         precondition(!permissions.snapshot.inputMonitoring && !permissions.inputMonitoringNeedsRestart)
         openSucceeds = false
-        permissions.request(.accessibility)
+        permissions.openSettings(.accessibility)
         precondition(permissions.settingsOpenFailed && !permissions.snapshot.accessibility)
         openSucceeds = true
-        permissions.request(.accessibility)
+        permissions.openSettings(.accessibility)
         precondition(!permissions.settingsOpenFailed)
         current = PermissionSnapshot(accessibility: true, inputMonitoring: true)
         let fresh = PermissionController(access: access)
