@@ -79,7 +79,7 @@ Then enable **Touch Up** in both **Privacy & Security → Accessibility**
 **Privacy & Security → Input Monitoring**, quit and relaunch after granting access,
 connect the display's USB touch connection, check its **Touchscreens** mapping, and turn on
 **Drawing Mode**. Grant permission to the installed copy; permissions may need reapproval
-after replacing a development build. The app keeps the upstream bundle identifier.
+after replacing a development build. The fork uses its own bundle identifier, `io.github.Ragura.TouchUp`; permissions and settings from earlier test builds may need to be configured again.
 
 For distribution without that development-build warning, use your own **Developer ID
 Application** certificate in Xcode's signing settings, **Product → Archive**, then Organizer's
@@ -148,3 +148,18 @@ renders the real component with fake states at 400 points wide without USB acces
 permission prompts. Missing, allowed and restart-required states were visually checked.
 The universal build passed; granting permissions and navigating System Settings still
 need validation on the installed, signed app on the target Mac.
+
+### Distribution packaging
+
+Run `bash scripts/release.sh prepare` to test and build an unsigned universal app.
+The app includes the upstream MIT licence. Local workspaces are ignored by Git.
+
+For an actual release, install a Developer ID Application certificate and store
+notarization credentials locally with `xcrun notarytool store-credentials touch-up`.
+Enter credentials only into the tool's prompts, never into source files or chat.
+Then set `DEVELOPER_ID_IDENTITY` to the full certificate identity and
+`NOTARY_PROFILE=touch-up`, and run `bash scripts/release.sh notarize`.
+It rebuilds, signs, notarizes and staples the app, creates a drag-to-Applications
+DMG, and notarizes and staples that DMG. It stops on failed validation; it does not
+publish a GitHub release. Review the saved notarization logs and test the downloaded
+DMG and permissions on the target Mac before distributing it to colleagues.

@@ -87,3 +87,6 @@ iOSInjectionProject/
 *.provisionprofile
 .env
 .env.*
+
+# Local release workspaces
+build-release.*/

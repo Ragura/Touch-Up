@@ -1,0 +1,18 @@
+Touch Up — Ragura fork
+
+1. Quit any running copy of Touch Up.
+2. Drag Touch Up into Applications, then open it from Applications.
+3. Allow Device Control & Data Access (Accessibility on earlier macOS)
+   and Input Monitoring in System Settings > Privacy & Security.
+4. Quit and reopen Touch Up after granting Input Monitoring.
+5. Connect the board USB cable, check the screen mapping in Touch Up settings,
+   enable Control Mouse with Touch and Drawing Mode.
+
+This release uses a new app identifier. Earlier test-build permissions and settings
+may not carry over. Configure the screen mapping and Drawing Mode again.
+Drawing Mode supports immediate drawing, clicks and drags. Additional fingers are
+ignored. In Krijt, select Pan to move the canvas. Two-finger scrolling is not included.
+
+This is a modified open-source fork, not an official upstream release.
+Source: https://github.com/Ragura/Touch-Up/tree/codex/drawing-mode
+The MIT licence is included alongside the app and inside its Resources folder.
